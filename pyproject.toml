@@ -1,0 +1,12 @@
+[project]
+name = "text-to-speech"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "kokoro>=0.9.4",
+    "pip>=25.3",
+    "soundfile>=0.13.1",
+    "torch>=2.9.0",
+]
