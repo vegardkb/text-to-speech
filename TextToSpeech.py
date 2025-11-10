@@ -9,8 +9,8 @@ class TextToSpeech:
         self.lang_code = lang_code
         self.pipeline = KPipeline(lang_code=lang_code)
 
-    def process_file(self, file_path: str):
-        with open(file_path, "r", encoding="utf-8") as f:
+    def process_file(self, input_file: str, output_file: str):
+        with open(input_file, "r", encoding="utf-8") as f:
             text = f.read()
 
         text = text.replace("\n", " ")
@@ -24,11 +24,10 @@ class TextToSpeech:
                 f.write(f"file '{i}.wav'\n")
                 max_ind = i
 
-        out_file = file_path.replace(".txt", ".wav")
-        if os.path.isfile(out_file):
-            os.remove(out_file)
+        if os.path.isfile(output_file):
+            os.remove(output_file)
 
-        _ = os.system(f"ffmpeg -f concat -i audio_files.txt  -c copy {out_file}")
+        _ = os.system(f"ffmpeg -f concat -i audio_files.txt -c copy {output_file}")
 
         os.remove("audio_files.txt")
         for i in range(max_ind + 1):

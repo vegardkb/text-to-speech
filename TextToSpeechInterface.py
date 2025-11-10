@@ -1,4 +1,5 @@
 import os
+import shutil
 import threading
 import tkinter as tk
 from tkinter import filedialog, messagebox, scrolledtext, ttk
@@ -8,6 +9,9 @@ import soundfile as sf
 
 from TextToSpeech import TextToSpeech
 
+TEXT_FILE = "temp/text.txt"
+AUDIO_FILE = "temp/audio.wav"
+
 
 class TTSGUI:
     def __init__(self, root):
@@ -15,7 +19,6 @@ class TTSGUI:
         self.root.title("Text to Speech Player")
         self.tts = TextToSpeech()
 
-        self.audio_file: str = ""
         self.playing = False
         self.paused = False
         self.seek_time = 0
@@ -24,6 +27,7 @@ class TTSGUI:
         pygame.mixer.init()
 
         self.setup_gui()
+        self.clear_temp_files()
 
     def setup_gui(self):
         file_frame = ttk.Frame(self.root)
@@ -35,6 +39,10 @@ class TTSGUI:
         ttk.Button(
             file_frame, text="Generate Speech", command=self.generate_speech
         ).pack(side=tk.LEFT, padx=5)
+
+        ttk.Button(file_frame, text="Save", command=self.export_result).pack(
+            side=tk.LEFT, padx=5
+        )
 
         self.file_label = ttk.Label(file_frame, text="No file selected")
         self.file_label.pack(side=tk.LEFT, padx=10)
@@ -90,34 +98,58 @@ class TTSGUI:
             self.text_display.delete(1.0, tk.END)
             self.text_display.insert(1.0, content)
             if os.path.exists(file_path.replace(".txt", ".wav")):
-                self.audio_file = file_path.replace(".txt", ".wav")
+                shutil.copy(file_path.replace(".txt", ".wav"), AUDIO_FILE)
                 self.play_audio()
         except Exception as e:
             messagebox.showerror("Error", f"Could not load file: {e}")
 
+    def write_text_to_tmp_file(self):
+        if not os.path.exists(TEXT_FILE):
+            os.makedirs(os.path.dirname(TEXT_FILE), exist_ok=True)
+
+        with open(TEXT_FILE, "w", encoding="utf-8") as f:
+            f.write(self.text_display.get(1.0, tk.END))
+
     def generate_speech(self):
-        if not hasattr(self, "current_file"):
-            messagebox.showwarning("Warning", "Please select a text file first")
+        if not self.text_display.get(1.0, tk.END).strip():
+            messagebox.showwarning("Warning", "Please write/load some text first")
             return
+
+        self.write_text_to_tmp_file()
 
         def process_in_thread():
             try:
-                self.tts.process_file(self.current_file)
-                audio_file = self.current_file.replace(".txt", ".wav")
-                self.root.after(0, lambda: self.on_generation_complete(audio_file))
+                self.tts.process_file(TEXT_FILE, AUDIO_FILE)
+                self.root.after(0, lambda: self.on_generation_complete())
             except Exception as e:
                 self.root.after(0, lambda: messagebox.showerror("Error", str(e)))
 
         threading.Thread(target=process_in_thread, daemon=True).start()
         messagebox.showinfo("Processing", "Generating audio...")
 
-    def on_generation_complete(self, audio_file):
-        self.audio_file = audio_file
+    def on_generation_complete(self):
         messagebox.showinfo("Success", "Audio generation completed!")
         self.play_audio()
 
+    def export_result(self):
+        if not os.path.isfile(AUDIO_FILE):
+            messagebox.showwarning("Warning", "No audio file generated")
+            return
+
+        if not os.path.isfile(TEXT_FILE):
+            messagebox.showwarning("Warning", "No text file generated")
+            return
+
+        file_path = filedialog.asksaveasfilename(
+            defaultextension=".wav", filetypes=[("Wave Files", "*.wav")]
+        )
+        if file_path:
+            shutil.copy(AUDIO_FILE, file_path)
+            shutil.copy(TEXT_FILE, file_path.replace(".wav", ".txt"))
+            messagebox.showinfo("Success", f"Audio and text exported to {file_path}")
+
     def toggle_playback(self):
-        if not self.audio_file:
+        if not os.path.isfile(AUDIO_FILE):
             messagebox.showwarning("Warning", "No audio file loaded")
             return
 
@@ -129,10 +161,10 @@ class TTSGUI:
     def play_audio(self):
         try:
             if not self.paused:
-                pygame.mixer.music.load(self.audio_file)
+                pygame.mixer.music.load(AUDIO_FILE)
                 pygame.mixer.music.play()
 
-                audio_info = sf.info(self.audio_file)
+                audio_info = sf.info(AUDIO_FILE)
                 self.audio_length = audio_info.duration
                 self.seek_bar.config(from_=0, to=self.audio_length)
                 self.seek_val = 0
@@ -192,6 +224,13 @@ class TTSGUI:
         else:
             self.playing = False
             self.play_button.config(text="Play")
+
+    def clear_temp_files(self):
+        if os.path.isfile(AUDIO_FILE):
+            os.remove(AUDIO_FILE)
+
+        if os.path.isfile(TEXT_FILE):
+            os.remove(TEXT_FILE)
 
     def format_time(self, seconds):
         minutes = int(seconds // 60)
