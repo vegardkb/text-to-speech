@@ -3,6 +3,8 @@
 A text-to-speech app that runs locally on your computer. Based on Kokoro https://huggingface.co/hexgrad/Kokoro-82M.
 
 ## Quick Start
+Clone the repository.
+
 Install uv: https://docs.astral.sh/uv/getting-started/installation/
 
 Install the required dependencies using uv:
